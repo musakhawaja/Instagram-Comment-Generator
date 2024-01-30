@@ -133,4 +133,4 @@ def video_gen(media_path):
 # path_strings = [str(path) for path in paths]
 # path_strings
 # album_gen(path_strings)
-video_gen("/home/musa/Desktop/insta/christmas_nail2_3289870297142645854.mp4")
+# video_gen("/home/musa/Desktop/insta/christmas_nail2_3289870297142645854.mp4")

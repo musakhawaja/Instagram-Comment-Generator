@@ -11,9 +11,7 @@ load_dotenv()
 client = OpenAI(api_key = os.getenv('OPENAI_API_KEY'))
 cl = Client()
 
-def auth(username="ag.ha2308", password="kkjhjkk"):
-    username="ag.ha2308"
-    password="kkjhjkk"
+def auth(username, password):
     try:
         cl.login(username, password)
         return True
@@ -40,8 +38,8 @@ def image_gen(base64_image):
   completion = client.chat.completions.create(
       model="gpt-4-vision-preview",
       messages=[
-          {"role": "system", "content": "The content provided to you is an Instagram post. Analyze the content provided and suggest 10 different comments for Instagram. Each comment should be less than 20 charachters. Only use emojis for every 3rd comment and use emojis that can be used on instagram. The comments must be in Korean. Only return the comments"},
-          {"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}
+            {"role": "system", "content": "You are provided with an image. Examine the visual elements, context, and any text present in the image. Pay close attention to the themes, emotions, and messages conveyed by the image. Based on this comprehensive analysis, generate 10 unique and contextually appropriate comments for Instagram. Ensure each comment is concise, not exceeding 20 characters. For every third comment, include an emoji commonly used on Instagram. All comments should be written in Korean. Your response should consist only of the comments."},
+            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}
       ],
       max_tokens=4096
   )
@@ -63,7 +61,7 @@ def album_gen(image_paths):
         {
             "role": "user",
             "content": [
-                "The content provided to you is an Instagram post. Analyze the content provided and suggest 10 different comments for Instagram. Each comment should be less than 20 charachters. Include emojis in every 3rd comment and use emojis that can be used on instagram. The comments must be in Korean. Only return the comments",
+                "The content provided consists of a series of images from an album. Please analyze these images carefully, paying special attention to their context and any text they contain. Understand the themes, emotions, and messages conveyed by these images. Based on this in-depth analysis, craft 10 unique and contextually relevant comments suitable for Instagram. Each comment should be concise, not exceeding 20 characters. Incorporate emojis into every third comment, using emojis that are commonly seen on Instagram. All comments should be written in Korean. Please return only the comments.",
                 *map(lambda x: {"image": x, "resize": 768}, base64Frames[0::len(base64Frames)//50 if len(base64Frames) >= 50 else 1]),
             ],
         },
@@ -71,7 +69,7 @@ def album_gen(image_paths):
     params = {
         "model": "gpt-4-vision-preview",
         "messages": PROMPT_MESSAGES,
-        "max_tokens": 200,
+        "max_tokens": 4096,
     }
 
     result = client.chat.completions.create(**params)
@@ -80,7 +78,7 @@ def album_gen(image_paths):
 
 
 
-def video_gen(media_path):
+def video_gen(media_path,frame_skip=50):
     try:
         print(f"Attempting to open video file at: {media_path}")
         media_path_str = str(media_path)  # Explicitly convert to string
@@ -94,19 +92,22 @@ def video_gen(media_path):
             raise ValueError(f"Unable to open video file at {media_path_str}")
 
         base64Frames = []
+        frame_count = 0
         while video.isOpened():
             success, frame = video.read()
             if not success:
                 break
-            _, buffer = cv2.imencode(".jpg", frame)
-            base64Frames.append(base64.b64encode(buffer).decode("utf-8"))
+            if frame_count % frame_skip == 0:
+                _, buffer = cv2.imencode(".jpg", frame)
+                base64Frames.append(base64.b64encode(buffer).decode("utf-8"))
+            frame_count += 1
 
         video.release()
         PROMPT_MESSAGES = [
         {
             "role": "user",
             "content": [
-                "The content provided to you is an Instagram post. Analyze the content provided and suggest 10 different comments for Instagram. Each comment should be less than 20 charachters. Include emojis in every 3rd comment and use emojis that can be used on instagram. The comments must be in Korean. Only return the comments",
+                "The content provided consists of a series of video frames. Please analyze these frames closely, focusing on their context and any text they contain. Understand the overarching themes, emotions, and messages conveyed through these frames. Based on this in-depth analysis, craft 10 unique and contextually relevant comments suitable for Instagram. Each comment should be concise, not exceeding 20 characters. Include emojis in every third comment, choosing emojis that are popular on Instagram. The comments should be formulated in Korean. Please return only the comments.",
                 *map(lambda x: {"image": x, "resize": 768}, base64Frames[0::50]),
             ],
         },
@@ -114,23 +115,20 @@ def video_gen(media_path):
         params = {
             "model": "gpt-4-vision-preview",
             "messages": PROMPT_MESSAGES,
-            "max_tokens": 200,
+            "max_tokens": 4096,
         }
 
         result = client.chat.completions.create(**params)
         print(result.choices[0].message.content)
         return result.choices[0].message.content
     except Exception as e:
-        print(f"An error occurred in video_gen: {e}")
-        return str(e)
+        if "request too large" in str(e).lower():
+            # If the error is due to a large request, retry with fewer frames
+            new_frame_skip = frame_skip * 2
+            print(f"Request too large, retrying with frame skip: {new_frame_skip}")
+            return video_gen(media_path, frame_skip=new_frame_skip)
+        else:
+            print(f"An error occurred in video_gen: {e}")
+            return str(e)
 
-
-# auth()
-# paths = media_download(url="https://www.instagram.com/p/C2hsw-irYAk/?img_index=1",option="Album")
-# # print(path)
-# # img = encode_image(path)
-# # image_gen(img)
-# path_strings = [str(path) for path in paths]
-# path_strings
-# album_gen(path_strings)
-# video_gen("/home/musa/Desktop/insta/christmas_nail2_3289870297142645854.mp4")
+# video_gen("/home/musa/Desktop/insta/withnami_3284820004305749845.mp4")

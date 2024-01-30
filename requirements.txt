@@ -1,0 +1,8 @@
+instagrapi==2.0.3
+openai==1.10.0
+opencv_python==4.9.0.80
+opencv_python_headless==4.9.0.80
+Pillow==10.2.0
+python-dotenv==1.0.1
+streamlit==1.30.0
+ffmpeg-python

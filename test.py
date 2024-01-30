@@ -5,7 +5,7 @@ import os
 import base64
 import cv2
 from pathlib import Path
-
+from moviepy.editor import VideoFileClip
 
 load_dotenv()
 client = OpenAI(api_key = os.getenv('OPENAI_API_KEY'))
@@ -19,6 +19,12 @@ def auth(username, password):
         print(f"Login failed: {e}")
         return False
 
+def extract_audio(video_path, audio_path="temp_audio.wav"):
+    video = VideoFileClip(video_path)
+    audio = video.audio
+    audio.write_audiofile(audio_path)
+    video.close()
+    return audio_path
 
 def media_download(url,option):
     media_pk = cl.media_pk_from_url(url)
@@ -77,12 +83,20 @@ def album_gen(image_paths):
     return result.choices[0].message.content
 
 
+def transcribe(audio_path):
+    audio_file= open(audio_path, "rb")
+    transcript = client.audio.transcriptions.create(
+    model="whisper-1", 
+    file=audio_file
+    )
+    return transcript
 
 def video_gen(media_path,frame_skip=50):
     try:
         print(f"Attempting to open video file at: {media_path}")
         media_path_str = str(media_path)  # Explicitly convert to string
-
+        audio_path = extract_audio(media_path_str)
+        transcription = transcribe(audio_path)
         if not os.path.exists(media_path_str):
             raise FileNotFoundError(f"Video file does not exist at {media_path_str}")
 
@@ -107,7 +121,7 @@ def video_gen(media_path,frame_skip=50):
         {
             "role": "user",
             "content": [
-                "The content provided consists of a series of video frames. Please analyze these frames closely, focusing on their context and any text they contain. Understand the overarching themes, emotions, and messages conveyed through these frames. Based on this in-depth analysis, craft 10 unique and contextually relevant comments suitable for Instagram. Each comment should be concise, not exceeding 20 characters. Include emojis in every third comment, choosing emojis that are popular on Instagram. The comments should be formulated in Korean. Please return only the comments.",
+                f"The content provided consists of a series of video frames. Please analyze these frames closely, focusing on their context and any text they contain. Understand the overarching themes, emotions, and messages conveyed through these frames. Based on this in-depth analysis, craft 10 unique and contextually relevant comments suitable for Instagram. Each comment should be concise, not exceeding 20 characters. Include emojis in every third comment, choosing emojis that are popular on Instagram. The comments should be formulated in Korean. Please return only the comments. Here is the audio transcript of the video to give you context: {transcription}",
                 *map(lambda x: {"image": x, "resize": 768}, base64Frames[0::50]),
             ],
         },
@@ -178,7 +192,8 @@ def video_caption(media_path,frame_skip=50):
     try:
         print(f"Attempting to open video file at: {media_path}")
         media_path_str = str(media_path)  # Explicitly convert to string
-
+        audio_path = extract_audio(media_path_str)
+        transcription = transcribe(audio_path)
         if not os.path.exists(media_path_str):
             raise FileNotFoundError(f"Video file does not exist at {media_path_str}")
 
@@ -203,7 +218,7 @@ def video_caption(media_path,frame_skip=50):
         {
             "role": "user",
             "content": [
-                "The content provided consists of a series of video frames. Observe these frames carefully, focusing on their context, visual elements, and any text they may include. Consider the overarching themes, emotions, and messages these frames convey. Using this detailed understanding, create 10 unique captions in Korean, each offering a first-person perspective as if you are part of the scene or experiencing the moment depicted in the frames. Ensure each caption is succinct, aiming not to exceed 20 characters. Integrate an emoji in every third caption to add an expressive element, selecting emojis that are popular on Instagram. The final output should consist only of these first-person perspective captions.",
+                f"The content provided consists of a series of video frames. Observe these frames carefully, focusing on their context, visual elements, and any text they may include. Consider the overarching themes, emotions, and messages these frames convey. Using this detailed understanding, create 10 unique captions in Korean, each offering a first-person perspective as if you are part of the scene or experiencing the moment depicted in the frames. Ensure each caption is succinct, aiming not to exceed 20 characters. Integrate an emoji in every third caption to add an expressive element, selecting emojis that are popular on Instagram. The final output should consist only of these first-person perspective captions. Here is the audio transcription of the video to give you context: {transcription}",
                 *map(lambda x: {"image": x, "resize": 768}, base64Frames[0::50]),
             ],
         },
@@ -224,8 +239,8 @@ def video_caption(media_path,frame_skip=50):
             print(f"Request too large, retrying with frame skip: {new_frame_skip}")
             return video_gen(media_path, frame_skip=new_frame_skip)
         else:
-            print(f"An error occurred in video_gen: {e}")
+            print(f"An error occurred in video_caption: {e}")
             return str(e)
+        
 
-
-# video_gen("/home/musa/Desktop/insta/withnami_3284820004305749845.mp4")
+# video_gen("/home/musa/Desktop/insta/gymenity_3274305671774075630.mp4")
